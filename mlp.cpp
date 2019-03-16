@@ -9,50 +9,63 @@ CSV writer (csv_writer.h) source code:
 https://github.com/vincentlaucsb/csv-parser
 */
 
+#include "NeuralNetwork.hpp"
 #include "graph_helper.hpp"
 #include "lib/csv.h"
 #include "lib/csv_writer.hpp"
-#include "neuron.hpp"
 #include <bits/stdc++.h>
 using namespace std;
 
-typedef tuple<double, double, double, double, double> ddddd;
-typedef tuple<double, double> dd;
-typedef vector<ddddd> vddddd;
+using vvdvd = vector<pair<vector<double>, vector<double>>>;
 
-template <class S, class T>
-tuple<S, T> operator+(const tuple<S, T>& lhs, const tuple<S, T>& rhs) {
-	return make_tuple(get<0>(lhs) + get<0>(rhs), get<1>(lhs) + get<1>(rhs));
-}
-
-template <class S, class T>
-tuple<S, T> operator/(const tuple<S, T>& lhs, const double& rhs) {
-	return make_tuple(get<0>(lhs) / rhs, get<1>(lhs) / rhs);
-}
-
-dd runEpoch(double& w1, double& w2, double& w3, double& w4, double& b, int bv, int ev, int fold, int maxFold, double lrate, int epochNum);
-double train(int idx, double& w1, double& w2, double& w3, double& w4, double& b, double lrate);
-double validation(double w1, double w2, double w3, double w4, double b, int bv, int ev, int maxFold);
-void slpRun(double lrate, int maxFold, int maxEpoch);
-
-vddddd csvdata;
+vvdvd csvdata;
 int kFold = 5;
 int epoch = 300;
 
 int main() {
-	double x1, x2, x3, x4, y;
-	io::CSVReader<5> csv("iris_mlp.csv");
-	csv.read_header(io::ignore_extra_column, "x1", "x2", "x3", "x4", "type");
-	while (csv.read_row(x1, x2, x3, x4, y)) {
-		csvdata.push_back(make_tuple(x1, x2, x3, x4, y));
+	double x1, x2, x3, x4, t1, t2;
+	io::CSVReader<6> csv("iris_mlp.csv");
+	csv.read_header(io::ignore_extra_column, "x1", "x2", "x3", "x4", "t1", "t2");
+	while (csv.read_row(x1, x2, x3, x4, t1, t2)) {
+		vector<double> input = { x1, x2, x3, x4 };
+		vector<double> output = { t1, t2 };
+		csvdata.push_back(make_pair(input, output));
 	}
 
-	slpRun(0.1, kFold, epoch);
-	slpRun(0.8, kFold, epoch);
+	pair<vector<double>, vector<double>> data1;
+
+	data1 = csvdata[0];
+
+	printf("data testing:\nx1: %lf x2: %lf x3: %lf x4: %lf t1: %lf t2: %lf\n", data1.first[0], data1.first[1], data1.first[2], data1.first[3], data1.second[0], data1.second[1]);
+
+	Activation sigmoid = [](double x) { return 1.0 / (1 - exp(x)); };
+	NeuralNetwork nn(4, 2, sigmoid);
+	nn.setInput(data1.first);
+	nn.addHiddenNeuron();
+	nn.addHiddenNeuron();
+	nn.addHiddenNeuron();
+	nn.addHiddenNeuron();
+	vector<NeuronPtr> outNeuron = nn.getOutputNeurons();
+	vector<NeuronPtr> hiddenNeuron = nn.getHiddenNeurons();
+	for (int i = 0; i < outNeuron.size(); i++) {
+		for (int j = 0; j < hiddenNeuron.size(); j++) {
+			outNeuron[i]->setInput(dynamic_cast<NodePtr>(hiddenNeuron[j]), j);
+		}
+	}
+	nn.recalculate();
+
+	vector<int> predTest;
+	vector<double> outTest;
+	predTest = nn.getPrediction();
+	outTest = nn.getOutput();
+
+	printf("data test prediction:\nt1: %d t2: %d\n", predTest[0], predTest[1]);
+	printf("data test output:\no1: %lf o2: %lf\n", outTest[0], outTest[1]);
 
 	getchar();
 }
 
+/*
 void slpRun(double lrate, int maxFold, int maxEpoch) {
 	char cname[255];
 	sprintf(cname, "%.1lf", lrate);
@@ -173,3 +186,4 @@ double validation(double w1, double w2, double w3, double w4, double b, int bv, 
 
 	return double(tp + tn) / double(csvdata.size() / maxFold);
 }
+*/
