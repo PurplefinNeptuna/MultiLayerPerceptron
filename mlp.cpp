@@ -38,7 +38,7 @@ int main() {
 
 	printf("data testing:\nx1: %lf x2: %lf x3: %lf x4: %lf t1: %lf t2: %lf\n", data1.first[0], data1.first[1], data1.first[2], data1.first[3], data1.second[0], data1.second[1]);
 
-	Activation sigmoid = [](double x) { return 1.0 / (1 - exp(x)); };
+	Activation sigmoid = [](double x) { return 1.0 / (1 + exp(-x)); };
 	NeuralNetwork nn(4, 2, sigmoid);
 	nn.setInput(data1.first);
 	nn.addHiddenNeuron();

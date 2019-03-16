@@ -32,7 +32,7 @@ Neuron::Neuron(int iSize) {
 	traverseVisited = false;
 	setInputSize(iSize);
 	activator = [](double x) {
-		return 1.0 / (1 - exp(x));
+		return 1.0 / (1 + exp(-x));
 	};
 }
 
