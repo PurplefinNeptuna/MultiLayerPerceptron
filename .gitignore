@@ -1,0 +1,6 @@
+*.csv
+*.txt
+.vscode/
+lib/
+obj/
+build/
