@@ -41,15 +41,18 @@ int main() {
 	Activation sigmoid = [](double x) { return 1.0 / (1 + exp(-x)); };
 	NeuralNetwork nn(4, 2, sigmoid);
 	nn.setInput(data1.first);
-	nn.addHiddenNeuron();
-	nn.addHiddenNeuron();
-	nn.addHiddenNeuron();
-	nn.addHiddenNeuron();
-	vector<NeuronPtr> outNeuron = nn.getOutputNeurons();
-	vector<NeuronPtr> hiddenNeuron = nn.getHiddenNeurons();
+	vector<NeuronPtr> outNeuron = nn.getNeurons();
+	vector<NeuronPtr> hiddenNeuron;
+	hiddenNeuron.push_back(nn.addNeuron());
+	hiddenNeuron.push_back(nn.addNeuron());
+	hiddenNeuron.push_back(nn.addNeuron());
+	hiddenNeuron.push_back(nn.addNeuron());
 	for (int i = 0; i < outNeuron.size(); i++) {
 		for (int j = 0; j < hiddenNeuron.size(); j++) {
-			outNeuron[i]->setInput(dynamic_cast<NodePtr>(hiddenNeuron[j]), j);
+			NodePtr childPtr = dynamic_cast<NodePtr>(hiddenNeuron[j]);
+			NodePtr parentPtr = dynamic_cast<NodePtr>(outNeuron[i]);
+			outNeuron[i]->setInput(childPtr, j);
+			hiddenNeuron[j]->addOutput(parentPtr, j);
 		}
 	}
 	nn.recalculate();
