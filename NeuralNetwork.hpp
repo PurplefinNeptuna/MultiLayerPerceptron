@@ -1,4 +1,5 @@
 #include <functional>
+#include <string>
 #include <vector>
 using namespace std;
 
@@ -8,6 +9,7 @@ class OutputNode;
 class Neuron;
 
 using Activation = function<double(double)>;
+using Deactivation = function<double(double, double)>;
 using NodePtr = Node*;
 using InputNodePtr = InputNode*;
 using OutputNodePtr = OutputNode*;
@@ -33,10 +35,17 @@ public:
 class OutputNode : public Node {
 private:
 	NeuronPtr outNeuron;
+	int target;
+	double derrdout;
 
 public:
 	OutputNode();
 	void setOutputNeuron(NeuronPtr neuron);
+	void setTarget(int tar);
+	void recalculate();
+	int getTarget();
+	double getDerrDout();
+	double getError();
 	double getOutput();
 	int getPrediction();
 	int getType();
@@ -45,27 +54,37 @@ public:
 class Neuron : public Node {
 private:
 	int inputCount;
-	double bias, lastNet, lastOutput;
+	double bias, lastNet, lastOutput, derrdout, derrdnet, learningRate;
 	vector<double> theta;
 	vector<NodePtr> nodeForInput;
 	vector<pair<NodePtr, int>> nodeForOutput;
 	Activation activator;
+	Deactivation deactivator;
 
 public:
 	bool traverseVisited;
+	string name;
 
-	Neuron(int iCount, Activation func);
-	void setActivationFunction(Activation func);
+	Neuron(int iCount, Activation func, Deactivation dfunc);
+	void setActivationFunction(Activation func, Deactivation dfunc);
+	void setTheta(int idx, double newtheta);
+	void setBias(double newbias);
+	double getBias();
+	void setLearningRate(double lr);
+	double getTheta(int idx);
 	double getNet();
 	double getOutput();
+	double getDerrDout();
+	double getDerrDnet();
 	int getType();
 	void setInput(NodePtr input, int idx);
 	void addOutput(NodePtr output, int inputNum);
 	void removeOutput(NodePtr output);
 	vector<NodePtr> getInputNode();
 	vector<NodePtr> getOutputNode();
-	vector<pair<NodePtr, int>> getOutputNodeWithInputIndex();
 	void recalculate();
+	void recalculateDerrDnet();
+	void train();
 	void setInputSize(int size);
 };
 
@@ -73,7 +92,9 @@ class NeuralNetwork {
 private:
 	int outputCount;
 	int inputCount;
+	double learningRate;
 	Activation defaultActivationFunction;
+	Deactivation defaultDeactivationFunction;
 	vector<OutputNodePtr> outputNodes;
 	vector<NeuronPtr> allNeuron;
 	vector<NeuronPtr> neuronTraverse;
@@ -83,13 +104,21 @@ private:
 	void feedForward();
 
 public:
-	NeuralNetwork(int iCount, int oCount, Activation func);
+	NeuralNetwork(int iCount, int oCount, double lr, Activation func, Deactivation dfunc);
 	~NeuralNetwork();
-	void setActivationFunction(Activation func);
-	NeuronPtr addNeuron();
+	void setLearningRate(double lr);
+	void setActivationFunction(Activation func, Deactivation dfunc);
+	NeuronPtr addNeuron(string name);
 	void setInput(const vector<double>& input);
+	void setTarget(const vector<int>& target);
 	void recalculate();
+	void train();
+	void resetTheta();
 	vector<NeuronPtr> getNeurons();
+	vector<NeuronPtr> getTraverseNeurons();
+	vector<OutputNodePtr> getOutputNodes();
 	vector<int> getPrediction();
 	vector<double> getOutput();
+	vector<double> getError();
+	vector<string> getTraversePath();
 };

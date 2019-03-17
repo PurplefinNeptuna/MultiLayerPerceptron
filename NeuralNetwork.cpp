@@ -36,6 +36,27 @@ void OutputNode::setOutputNeuron(NeuronPtr n) {
 	outNeuron = n;
 }
 
+void OutputNode::setTarget(int tar) {
+	target = tar;
+	recalculate();
+}
+
+int OutputNode::getTarget() {
+	return target;
+}
+
+double OutputNode::getDerrDout() {
+	return derrdout;
+}
+
+void OutputNode::recalculate() {
+	derrdout = getOutput() - (double)target;
+}
+
+double OutputNode::getError() {
+	return 0.5 * (derrdout) * (derrdout);
+}
+
 double OutputNode::getOutput() {
 	if (outNeuron != nullptr) {
 		return outNeuron->getOutput();
@@ -53,14 +74,41 @@ int OutputNode::getType() {
 	return 3;
 }
 
-Neuron::Neuron(int iSize, Activation func) {
+Neuron::Neuron(int iSize, Activation func, Deactivation dfunc) {
 	traverseVisited = false;
 	setInputSize(iSize);
 	activator = func;
+	deactivator = dfunc;
 }
 
-void Neuron::setActivationFunction(Activation func) {
+void Neuron::setActivationFunction(Activation func, Deactivation dfunc) {
 	activator = func;
+	deactivator = dfunc;
+}
+
+void Neuron::setTheta(int idx, double newtheta) {
+	if (idx >= theta.size())
+		return;
+	theta[idx] = newtheta;
+}
+
+void Neuron::setBias(double newbias) {
+	bias = newbias;
+}
+
+double Neuron::getBias() {
+	return bias;
+}
+
+void Neuron::setLearningRate(double lr) {
+	learningRate = lr;
+}
+
+double Neuron::getTheta(int idx) {
+	if (idx >= theta.size())
+		return 0.0;
+	else
+		return theta[idx];
 }
 
 double Neuron::getNet() {
@@ -111,42 +159,75 @@ vector<NodePtr> Neuron::getOutputNode() {
 	return outputnodes;
 }
 
-vector<pair<NodePtr, int>> Neuron::getOutputNodeWithInputIndex() {
-	return nodeForOutput;
+double Neuron::getDerrDout() {
+	return derrdout;
+}
+
+double Neuron::getDerrDnet() {
+	return derrdnet;
 }
 
 void Neuron::recalculate() {
 	lastNet = 0.0;
-	//printf("input: ");
 	for (int i = 0; i < nodeForInput.size(); i++) {
 		if (nodeForInput[i] != nullptr) {
 			double inputi = nodeForInput[i]->getOutput();
-			//printf("%lf ", inputi);
 			lastNet += inputi * theta[i];
 		}
 	}
-	//printf("net: %lf ", lastNet);
+	lastNet += bias;
 	lastOutput = activator(lastNet);
-	//printf("out: %lf\n", lastOutput);
+}
+
+void Neuron::recalculateDerrDnet() {
+	derrdout = 0.0;
+	for (int i = 0; i < nodeForOutput.size(); i++) {
+		NodePtr outi = nodeForOutput[i].first;
+		int idx = nodeForOutput[i].second;
+		if (outi->getType() == 3) {
+			OutputNodePtr o = dynamic_cast<OutputNodePtr>(outi);
+			derrdout += o->getDerrDout();
+		} else if (outi->getType() == 2) {
+			NeuronPtr on = dynamic_cast<NeuronPtr>(outi);
+			derrdout += on->getDerrDnet() * on->getTheta(idx);
+		}
+	}
+	derrdnet = derrdout * deactivator(lastNet, lastOutput);
+}
+
+void Neuron::train() {
+	for (int i = 0; i < theta.size(); i++) {
+		double dtheta = derrdnet * nodeForInput[i]->getOutput();
+		theta[i] -= learningRate * dtheta;
+	}
+	bias -= learningRate * derrdnet;
 }
 
 void Neuron::setInputSize(int size) {
 	inputCount = size;
-	theta.resize(inputCount, 0.5);
+	int thetaOldSize = theta.size();
+	theta.resize(inputCount);
+	for (int i = thetaOldSize; i < theta.size(); i++) {
+		theta[i] = -1.0 + 2.0 * (double)rand() / (double)RAND_MAX;
+	}
 	nodeForInput.resize(inputCount, nullptr);
 }
 
-NeuralNetwork::NeuralNetwork(int iCount, int oCount, Activation func) {
+NeuralNetwork::NeuralNetwork(int iCount, int oCount, double lr, Activation func, Deactivation dfunc) {
 	inputCount = iCount;
 	outputCount = oCount;
+	learningRate = lr;
 	defaultActivationFunction = func;
+	defaultDeactivationFunction = dfunc;
 	for (int i = 0; i < inputCount; i++) {
 		inputs.push_back(new InputNode());
 	}
 	for (int i = 0; i < outputCount; i++) {
 		OutputNodePtr outNode = new OutputNode();
 		outputNodes.push_back(outNode);
-		NeuronPtr outNeuron = new Neuron(inputCount, defaultActivationFunction);
+		NeuronPtr outNeuron = new Neuron(inputCount, defaultActivationFunction, defaultDeactivationFunction);
+		outNeuron->name = "o" + to_string(i + 1);
+		outNeuron->setLearningRate(lr);
 		outNeuron->addOutput(dynamic_cast<NodePtr>(outNode), 0);
 		outNode->setOutputNeuron(outNeuron);
 		for (int j = 0; j < inputCount; j++) {
@@ -173,10 +254,18 @@ NeuralNetwork::~NeuralNetwork() {
 	inputs.clear();
 }
 
-void NeuralNetwork::setActivationFunction(Activation func) {
-	defaultActivationFunction = func;
+void NeuralNetwork::setLearningRate(double lr) {
+	learningRate = lr;
 	for (int i = 0; i < allNeuron.size(); i++) {
-		allNeuron[i]->setActivationFunction(func);
+		allNeuron[i]->setLearningRate(learningRate);
+	}
+}
+
+void NeuralNetwork::setActivationFunction(Activation func, Deactivation dfunc) {
+	defaultActivationFunction = func;
+	defaultDeactivationFunction = dfunc;
+	for (int i = 0; i < allNeuron.size(); i++) {
+		allNeuron[i]->setActivationFunction(defaultActivationFunction, defaultDeactivationFunction);
 	}
 	feedForward();
 }
@@ -223,10 +312,17 @@ void NeuralNetwork::feedForward() {
 	for (int i = 0; i < neuronTraverse.size(); i++) {
 		neuronTraverse[i]->recalculate();
 	}
+	for (int i = 0; i < outputNodes.size(); i++) {
+		outputNodes[i]->recalculate();
+	}
+	for (int i = neuronTraverse.size() - 1; i >= 0; i--) {
+		neuronTraverse[i]->recalculateDerrDnet();
+	}
 }
 
-NeuronPtr NeuralNetwork::addNeuron() {
-	NeuronPtr newNeuron = new Neuron(inputCount, defaultActivationFunction);
+NeuronPtr NeuralNetwork::addNeuron(string name) {
+	NeuronPtr newNeuron = new Neuron(inputCount, defaultActivationFunction, defaultDeactivationFunction);
+	newNeuron->name = name;
 	for (int i = 0; i < inputCount; i++) {
 		newNeuron->setInput(dynamic_cast<NodePtr>(inputs[i]), i);
 	}
@@ -235,8 +331,15 @@ NeuronPtr NeuralNetwork::addNeuron() {
 }
 
 void NeuralNetwork::setInput(const vector<double>& input) {
-	for (int i = 0; i < input.size(); i++) {
+	for (int i = 0; i < min(input.size(), inputs.size()); i++) {
 		inputs[i]->setValue(input[i]);
+	}
+	feedForward();
+}
+
+void NeuralNetwork::setTarget(const vector<int>& target) {
+	for (int i = 0; i < min(target.size(), outputNodes.size()); i++) {
+		outputNodes[i]->setTarget(target[i]);
 	}
 	feedForward();
 }
@@ -246,8 +349,32 @@ void NeuralNetwork::recalculate() {
 	feedForward();
 }
 
+void NeuralNetwork::train() {
+	for (int i = neuronTraverse.size() - 1; i >= 0; i--) {
+		neuronTraverse[i]->train();
+	}
+	feedForward();
+}
+
+void NeuralNetwork::resetTheta() {
+	for (int i = 0; i < allNeuron.size(); i++) {
+		NeuronPtr nowneuron = allNeuron[i];
+		for (int j = 0; j < nowneuron->getInputNode().size(); j++) {
+			nowneuron->setTheta(j, -1.0 + 2.0 * (double)rand() / (double)RAND_MAX);
+		}
+	}
+}
+
 vector<NeuronPtr> NeuralNetwork::getNeurons() {
 	return allNeuron;
+}
+
+vector<NeuronPtr> NeuralNetwork::getTraverseNeurons() {
+	return neuronTraverse;
+}
+
+vector<OutputNodePtr> NeuralNetwork::getOutputNodes() {
+	return outputNodes;
 }
 
 vector<int> NeuralNetwork::getPrediction() {
@@ -263,6 +390,22 @@ vector<double> NeuralNetwork::getOutput() {
 	vector<double> ans;
 	for (int i = 0; i < outputNodes.size(); i++) {
 		ans.push_back(outputNodes[i]->getOutput());
+	}
+	return ans;
+}
+
+vector<double> NeuralNetwork::getError() {
+	vector<double> ans;
+	for (int i = 0; i < outputNodes.size(); i++) {
+		ans.push_back(outputNodes[i]->getError());
+	}
+	return ans;
+}
+
+vector<string> NeuralNetwork::getTraversePath() {
+	vector<string> ans;
+	for (int i = 0; i < neuronTraverse.size(); i++) {
+		ans.push_back(neuronTraverse[i]->name);
 	}
 	return ans;
 }
