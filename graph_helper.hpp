@@ -53,6 +53,35 @@ inline void buildGraph(string name, const vector<double>& x, const vector<double
 	plot->plot_xy(x, y, name);
 
 	pngGraph(name, x, y, logx, logy, xmin, xmax, ymin, ymax, title, additionalLineStyle, color);
+
+	delete plot;
+}
+
+inline void build2Graph(string name, const vector<double>& x, const vector<double>& y, const vector<double>& y2, bool logx, bool logy, double xmin, double xmax, double ymin, double ymax, string title, string additionalLineStyle, string color) {
+	Gnuplot* plot = new Gnuplot();
+	plot->cmd("set output");
+	plot->cmd("set term qt title \"" + title + "\"");
+	plot->set_style("lines lw 2");
+	plot->cmd("set style line 1 lc rgb \'#FF0000\' lw 2");
+	plot->cmd("set style line 2 lc rgb \'#00FF00\' lw 2");
+	plot->set_title(title);
+	plot->set_grid();
+	if (logx == true) {
+		plot->set_xlogscale();
+	} else {
+		plot->set_xrange(xmin, xmax);
+	}
+
+	if (logy == true) {
+		plot->set_ylogscale();
+	} else {
+		plot->set_yrange(ymin, ymax);
+	}
+
+	plot->plot_xy(x, y, name + "_l_r_n");
+	plot->plot_xy(x, y2, name + "_v_a_l");
+
+	delete plot;
 }
 
 #endif

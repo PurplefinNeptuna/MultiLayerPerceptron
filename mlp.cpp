@@ -14,7 +14,7 @@ using namespace std;
 
 using vvdvi = vector<pair<vector<double>, vector<int>>>;
 
-pair<double, double> runEpoch(NeuralNetwork& nn, int trainSize, int validSize);
+pair<pair<double, double>, double> runEpoch(NeuralNetwork& nn, int trainSize, int validSize);
 void runMLP(double lrate, int epoch, int trainSize, int validSize, NeuralNetwork& nn);
 
 vvdvi csvdata;
@@ -79,8 +79,8 @@ int main() {
 
 void runMLP(double lrate, int epoch, int trainSize, int validSize, NeuralNetwork& nn) {
 	char cname[255];
-	vector<double> errx, erry, accx, accy;
-	pair<double, double> eaEpoch;
+	vector<double> errx, erry, erry2, accx, accy;
+	pair<pair<double, double>, double> eaEpoch;
 
 	sprintf(cname, "%.1lf", lrate);
 	string lrateName = string(cname);
@@ -92,21 +92,23 @@ void runMLP(double lrate, int epoch, int trainSize, int validSize, NeuralNetwork
 		errx.push_back(i);
 		accx.push_back(i);
 		eaEpoch = runEpoch(nn, trainSize, validSize);
-		erry.push_back(eaEpoch.first);
+		erry.push_back(eaEpoch.first.first);
+		erry2.push_back(eaEpoch.first.second);
 		accy.push_back(eaEpoch.second);
 	}
-	string errName = "error " + lrateName, errTitle = "Error/epoch (lr=" + lrateName + ")", errStyle = "lw 3", errColor = "#FF0000";
-	buildGraph(errName, errx, erry, false, true, -10, epoch + 10, 0, 0, errTitle, errStyle, errColor);
+	string errName = "error " + lrateName, errTitle = "Error/epoch (lr=" + lrateName + ")", errStyle = "lw 2", errColor = "#FF0000";
+	build2Graph(errName, errx, erry, erry2, false, true, -10, epoch + 10, 0, 0, errTitle, errStyle, errColor);
 
-	string accName = "accuracy " + lrateName, accTitle = "Accuracy/epoch (lr=" + lrateName + ")", accStyle = "lw 3", accColor = "#0000FF";
+	string accName = "accuracy " + lrateName, accTitle = "Accuracy/epoch (lr=" + lrateName + ")", accStyle = "lw 2", accColor = "#0000FF";
 	buildGraph(accName, accx, accy, false, false, -10, epoch + 10, 0, 1.05, accTitle, accStyle, accColor);
 }
 
-pair<double, double> runEpoch(NeuralNetwork& nn, int trainSize, int validSize) {
+pair<pair<double, double>, double> runEpoch(NeuralNetwork& nn, int trainSize, int validSize) {
 	pair<vector<double>, vector<int>> data1;
-	vector<double> err;
+	vector<double> err, errval;
 	vector<int> pred;
 	double errtot = 0.0;
+	double errvaltot = 0.0;
 	double acctot = 0.0;
 
 	for (int i = 0; i < trainSize; i++) {
@@ -146,12 +148,19 @@ pair<double, double> runEpoch(NeuralNetwork& nn, int trainSize, int validSize) {
 
 		nn.setInput(data1.first);
 		nn.setTarget(data1.second);
+		errval = nn.getError();
 		pred = nn.getPrediction();
 
 		if (pred[0] == data1.second[0] && pred[1] == data1.second[1]) {
 			acctot += 1.0;
 		}
+
+		double errnow = 0.0;
+		for (int j = 0; j < errval.size(); j++) {
+			errnow += errval[j];
+		}
+		errvaltot += errnow;
 	}
 
-	return make_pair(errtot / trainSize, acctot / validSize);
+	return make_pair(make_pair(errtot / trainSize, errvaltot / validSize), acctot / validSize);
 }
